@@ -6,9 +6,9 @@ import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.study.ecommerce.domain.category.entity.QCategory;
 import com.study.ecommerce.domain.product.dto.req.ProductSearchCondition;
 import com.study.ecommerce.domain.product.dto.resp.ProductSummaryDto;
-import com.study.ecommerce.domain.product.entity.Product;
 import com.study.ecommerce.domain.product.entity.Product.ProductStatus;
 import com.study.ecommerce.domain.product.entity.QProduct;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +31,7 @@ public class ProductQueryRepositoryCustom implements ProductQueryRepository{
     ) {
 
         QProduct product = QProduct.product;
+        QCategory category = QCategory.category;
 
         // 동적 쿼리를 생성하기 위한 조건
         BooleanBuilder builder = new BooleanBuilder();
