@@ -1,6 +1,7 @@
 package com.study.ecommerce.domain.product.repository;
 
 import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -8,8 +9,11 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.study.ecommerce.domain.category.entity.QCategory;
+import com.study.ecommerce.domain.member.entity.Member;
+import com.study.ecommerce.domain.member.entity.QMember;
 import com.study.ecommerce.domain.product.dto.req.ProductSearchCondition;
 import com.study.ecommerce.domain.product.dto.resp.ProductSummaryDto;
+import com.study.ecommerce.domain.product.entity.Product;
 import com.study.ecommerce.domain.product.entity.Product.ProductStatus;
 import com.study.ecommerce.domain.product.entity.QProduct;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +38,39 @@ public class ProductQueryRepositoryCustom implements ProductQueryRepository{
 
         QProduct product = QProduct.product;
         QCategory category = QCategory.category;
+        QMember member = QMember.member;
+
+        List<Tuple> tuples = queryFactory
+                .select(member.name, member.email)
+                .from(member)
+                .fetch();
+
+        for (Tuple tuple : tuples) {
+            String name = tuple.get(member.name);
+            String email = tuple.get(member.email);
+        }
+
+        // eq
+        // gt >
+        // goe >=
+        // lt <
+        // loe <=
+        // ne !=
+
+        // like
+        // contains ->
+        // startsWith -> 김
+        // endsWith ->
+
+        // isNull
+        // isNotNull
+
+        // between(20, 30)
+        // in("홍길동", "장길산")
+        // notIn()
+
+        // where , .and() -> and 조건 sql
+        // .or()
 
         List<ProductSummaryDto> content = queryFactory
                 .select(Projections.constructor(ProductSummaryDto.class,
@@ -140,4 +177,5 @@ public class ProductQueryRepositoryCustom implements ProductQueryRepository{
 
         return product.id.desc();
     }
+
 }
