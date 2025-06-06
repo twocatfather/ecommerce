@@ -3,6 +3,7 @@ package com.study.ecommerce.domain.product.repository;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -33,57 +35,79 @@ public class ProductQueryRepositoryCustom implements ProductQueryRepository{
         QProduct product = QProduct.product;
         QCategory category = QCategory.category;
 
-        // 동적 쿼리를 생성하기 위한 조건
-        BooleanBuilder builder = new BooleanBuilder();
-
-        if (StringUtils.hasText(condition.keyword())) {
-            builder.and(product.name.containsIgnoreCase(condition.keyword())
-                    .or(product.description.containsIgnoreCase(condition.keyword())));
-        }
-
-        if (condition.categoryId() != null) {
-            builder.and(product.categoryId.eq(condition.categoryId()));
-        }
-
-        if (condition.minPrice() != null) {
-            builder.and(product.price.goe(condition.minPrice()));
-        }
-
-        if (condition.maxPrice() != null) {
-            builder.and(product.price.loe(condition.maxPrice()));
-        }
-
-        if (condition.sellerId() != null) {
-            builder.and(product.sellerId.eq(condition.sellerId()));
-        }
-
-        builder.and(product.status.eq(ProductStatus.ACTIVE));
-
-        // 전체 카운트 쿼리
-        JPAQuery<Long> countQuery = queryFactory
-                .select(product.count())
-                .from(product)
-                .where(builder);
-
-        // 조인 없이 카테고리 이름을 가져오기 위한 서브 쿼리방식
-        // 실제 조회 쿼리
-        List<ProductSummaryDto> summaryDtos = queryFactory
+        List<ProductSummaryDto> content = queryFactory
                 .select(Projections.constructor(ProductSummaryDto.class,
                         product.id,
                         product.name,
                         product.price,
                         product.stockQuantity,
-                        // 카테고리 이름 대신 상수값을 변환
-                        Expressions.asString("Category").as("categoryName"),
+                        category.name.coalesce("분류 없음").as("categoryName"),
                         product.status))
                 .from(product)
-                .where(builder)
+                .leftJoin(category).on(product.categoryId.eq(category.id))
+                .where(
+                        keywordContains(condition.keyword()),
+                        categoryIdEq(condition.categoryId()),
+                        priceGoe(BigDecimal.valueOf(condition.minPrice())),
+                        priceLoe(BigDecimal.valueOf(condition.maxPrice())),
+                        sellerIdEq(condition.sellerId()),
+                        statusActive()
+                )
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .orderBy(getOrderSpecifier(pageable, product))
                 .fetch();
 
-        return PageableExecutionUtils.getPage(summaryDtos, pageable, countQuery::fetchOne);
+        return null;
+    }
+
+
+    /**
+     * 키워드 검색 조건 (상품명 또는 설명에 포함)
+     * @param keyword
+     * @return BooleanExpression
+     */
+    private BooleanExpression keywordContains(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+
+        QProduct product = QProduct.product;
+        return product.name.containsIgnoreCase(keyword)
+                .or(product.description.containsIgnoreCase(keyword));
+    }
+
+    /**
+     *  카테고리 ID 조건
+     * @param categoryId
+     * @return BooleanExpression
+     */
+    private BooleanExpression categoryIdEq(Long categoryId) {
+        return categoryId != null ? QProduct.product.categoryId.eq(categoryId) : null;
+    }
+
+    private BooleanExpression priceGoe(BigDecimal minPrice) {
+        return minPrice != null ? QProduct.product.price.goe(minPrice) : null;
+    }
+
+    private BooleanExpression priceLoe(BigDecimal maxPrice) {
+        return maxPrice != null ? QProduct.product.price.loe(maxPrice) : null;
+    }
+
+    private BooleanExpression sellerIdEq(Long sellerId) {
+        return sellerId != null ? QProduct.product.sellerId.eq(sellerId) : null;
+    }
+
+    private BooleanExpression statusActive() {
+        return QProduct.product.status.eq(ProductStatus.ACTIVE);
+    }
+
+    private BooleanExpression priceBetween(BigDecimal minPrice, BigDecimal maxPrice) {
+        return priceGoe(minPrice).and(priceLoe(maxPrice));
+    }
+
+    private BooleanExpression stockAvailable() {
+        return QProduct.product.stockQuantity.gt(0);
     }
 
     private OrderSpecifier<?> getOrderSpecifier(Pageable pageable, QProduct product) {
