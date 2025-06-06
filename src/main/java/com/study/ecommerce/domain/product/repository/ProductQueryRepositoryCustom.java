@@ -58,7 +58,19 @@ public class ProductQueryRepositoryCustom implements ProductQueryRepository{
                 .orderBy(getOrderSpecifier(pageable, product))
                 .fetch();
 
-        return null;
+        JPAQuery<Long> countQuery = queryFactory
+                .select(product.count())
+                .from(product)
+                .where(
+                        keywordContains(condition.keyword()),
+                        categoryIdEq(condition.categoryId()),
+                        priceGoe(BigDecimal.valueOf(condition.minPrice())),
+                        priceLoe(BigDecimal.valueOf(condition.maxPrice())),
+                        sellerIdEq(condition.sellerId()),
+                        statusActive()
+                );
+
+        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
     }
 
 
