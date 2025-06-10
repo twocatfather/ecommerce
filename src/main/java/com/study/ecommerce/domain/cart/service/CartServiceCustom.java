@@ -62,13 +62,76 @@ public class CartServiceCustom implements CartService{
     }
 
     @Override
+    @Transactional
     public CartItemResponse addCartItem(CartItemRequest request, String email) {
-        return null;
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+
+        Cart cart = cartRepository.findByMemberId(member.getId())
+                .orElseGet(() -> {
+                    Cart newCart = new Cart(member.getId());
+                    return cartRepository.save(newCart);
+                });
+
+        Product product = productRepository.findById(request.productId())
+                .orElseThrow(() -> new EntityNotFoundException("상품을 찾을 수 없습니다"));
+
+        // 이미 장바구니에 있는 상품인지?
+        CartItem cartItem;
+        if (cartItemRepository.existsByCartIdAndProductId(cart.getId(), product.getId())) {
+            cartItem = cartItemRepository.findByCartIdAndProductId(cart.getId(), product.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("장바구니 상품을 찾을 수 없습니다."));
+            cartItem.updateQuantity(cartItem.getQuantity() + request.quantity());
+
+        } else {
+            cartItem = CartItem.builder()
+                    .cartId(cart.getId())
+                    .productId(product.getId())
+                    .quantity(request.quantity())
+                    .build();
+        }
+
+        CartItem savedCartItem = cartItemRepository.save(cartItem);
+
+        return new CartItemResponse(
+                savedCartItem.getId(),
+                savedCartItem.getProductId(),
+                product.getName(),
+                product.getPrice(),
+                savedCartItem.getQuantity(),
+                product.getPrice() * savedCartItem.getQuantity()
+        );
     }
 
     @Override
     public CartItemResponse updateCartItem(Long cartItemId, CartItemRequest request, String email) {
-        return null;
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+
+        Cart cart = cartRepository.findByMemberId(member.getId())
+                .orElseThrow(() -> new EntityNotFoundException("장바구니 찾을 수 없습니다."));
+
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() -> new EntityNotFoundException("장바구니 상품을 찾을 수 없습니다."));
+
+        // 현재 사용자의 장바구니인지 확인
+        if (!cartItem.getCartId().equals(cart.getId())) {
+            throw new IllegalArgumentException("장바구니 상품 수정 권한이 없습니다.");
+        }
+
+        cartItem.updateQuantity(request.quantity());
+
+        Product product = productRepository.findById(cartItem.getProductId())
+                .orElseThrow(() -> new EntityNotFoundException("상품을 찾을 수 없습니다."));
+
+        return new CartItemResponse(
+                cartItem.getId(),
+                product.getId(),
+                product.getName(),
+                product.getPrice(),
+                cartItem.getQuantity(),
+                product.getPrice() * cartItem.getQuantity()
+        );
     }
 
     @Override
