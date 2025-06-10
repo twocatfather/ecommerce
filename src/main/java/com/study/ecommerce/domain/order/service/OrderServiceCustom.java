@@ -9,6 +9,7 @@ import com.study.ecommerce.domain.member.repository.MemberRepository;
 import com.study.ecommerce.domain.order.dto.OrderCreateRequest;
 import com.study.ecommerce.domain.order.dto.OrderCreateRequest.OrderItemRequest;
 import com.study.ecommerce.domain.order.dto.OrderDetailResponse;
+import com.study.ecommerce.domain.order.dto.OrderItemDto;
 import com.study.ecommerce.domain.order.dto.OrderResponse;
 import com.study.ecommerce.domain.order.entity.Order;
 import com.study.ecommerce.domain.order.entity.Order.OrderStatus;
@@ -90,12 +91,57 @@ public class OrderServiceCustom implements OrderService {
 
     @Override
     public OrderResponse cancelOrder(Long orderId, String email) {
+        // 주문 조회
+        // 주문자 확인
+
+        // 주문 상태 확인
+        // 결제 취소 (결제가 완료된 경우)
+
+        // 재고 원복
+
+        // 주문 상태를 변경
         return null;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderDetailResponse getOrderDetail(Long orderId, String email) {
-        return null;
+        // 주문 조회
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("주문을 찾을 수 없습니다. id = " + orderId));
+
+        // 주문자 확인
+        Member member = memberRepository.findById(order.getMemberId())
+                .orElseThrow(() -> new EntityNotFoundException("회원을 찾을 수 없습니다."));
+
+        if (!member.getEmail().equals(email)) {
+            throw new IllegalArgumentException("주문 조회 권한이 없습니다.");
+        }
+
+        // 주문 상품 조회
+        List<OrderItem> orderItems = orderItemRepository.findByOrderId(order.getId());
+        List<OrderItemDto> orderItemDtos = orderItems.stream()
+                .map(item -> {
+                    Product product = productRepository.findById(item.getProductId())
+                            .orElseThrow(() -> new EntityNotFoundException("상품을 찾을 수 없습니다."));
+                    return new OrderItemDto(
+                            product.getId(),
+                            product.getName(),
+                            item.getQuantity(),
+                            item.getPrice()
+                    );
+                })
+                .toList();
+
+        return new OrderDetailResponse(
+                order.getId(),
+                member.getId(),
+                member.getName(),
+                order.getStatus(),
+                order.getOrderDate(),
+                order.getTotalAmount(),
+                orderItemDtos
+        );
     }
 
     @Override

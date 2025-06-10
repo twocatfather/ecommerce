@@ -3,7 +3,6 @@ package com.study.ecommerce.domain.cart.repository;
 import com.study.ecommerce.domain.cart.entity.CartItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.lang.ScopedValue;
 import java.util.List;
 import java.util.Optional;
 
