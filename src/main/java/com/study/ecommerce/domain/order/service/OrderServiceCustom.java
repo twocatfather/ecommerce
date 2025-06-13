@@ -90,17 +90,47 @@ public class OrderServiceCustom implements OrderService {
     }
 
     @Override
+    @Transactional
     public OrderResponse cancelOrder(Long orderId, String email) {
         // 주문 조회
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("주문을 찾을 수 없습니다."));
+
         // 주문자 확인
+        Member member = memberRepository.findById(order.getMemberId())
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+
+        if (!member.getEmail().equals(email)) {
+            throw new IllegalArgumentException("주문 취소 권한이 없습니다.");
+        }
 
         // 주문 상태 확인
+        if (order.getStatus() == OrderStatus.SHIPPING || order.getStatus() == OrderStatus.DELIVERED) {
+            throw new IllegalArgumentException("배송 중이거나 배송이 완료된 주문은 취소할 수 없습니다.");
+        }
+
         // 결제 취소 (결제가 완료된 경우)
+        if (order.getStatus() == OrderStatus.PAID) {
+            Payment payment = paymentRepository.findByOrderId(order.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("결제 정보를 찾을 수 없습니다."));
+            mockPaymentService.cancelPayment(payment);
 
-        // 재고 원복
+            List<OrderItem> orderItems = orderItemRepository.findByOrderId(order.getId());
+            for (OrderItem item : orderItems) {
+                Product product = productRepository.findById(item.getProductId())
+                        .orElseThrow(() -> new EntityNotFoundException("상품을 찾을 수 없습니다."));
 
-        // 주문 상태를 변경
-        return null;
+                product.increasesStock(item.getQuantity());
+                productRepository.save(product);
+            }
+
+            // 주문 상태를 변경
+            order.updateStatus(OrderStatus.CANCELED);
+        }
+
+        orderRepository.save(order);
+
+        return new OrderResponse(order.getId(), order.getStatus(), order.getTotalAmount());
     }
 
     @Override
@@ -146,7 +176,12 @@ public class OrderServiceCustom implements OrderService {
 
     @Override
     public Page<OrderResponse> getOrders(String email, Pageable pageable) {
-        return null;
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+
+        Page<Order>orders = orderRepository.findByMemberId(member.getId(), pageable);
+
+        return orders.map(order -> new OrderResponse(order.getId(), order.getStatus(), order.getTotalAmount()));
     }
 
     private long processCartItems(Order order, List<Long> cartItemIds, Member member) {
