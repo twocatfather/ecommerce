@@ -40,7 +40,6 @@ public class ProductService {
         ));
     }
 
-
     @Transactional
     public ProductResponse createProduct(ProductCreateRequest request, String email) {
         Member seller = memberRepository.findByEmail(email)
