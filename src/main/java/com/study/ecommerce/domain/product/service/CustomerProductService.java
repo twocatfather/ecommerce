@@ -110,5 +110,52 @@ public class CustomerProductService {
     /**
      * 판매중인 상품 상세조회 -> id, ProductResponse
      */
+    public ProductResponse getActiveProduct(Long id) {
+        Product product = productRepository.findByIdAndStatus(id, ACTIVE)
+                .orElseThrow(() -> new EntityNotFoundException("판매중인 상품을 찾을 수 없습니다."));
+
+        String categoryName = "분류 없음";
+        if (product.getCategoryId() != null) {
+            Category category = categoryRepository.findById(product.getCategoryId())
+                    .orElse(null);
+
+            if (category != null) {
+                categoryName = category.getName();
+            }
+        }
+
+        return new ProductResponse(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                product.getStockQuantity(),
+                product.getStatus(),
+                categoryName
+        );
+    }
+
+    /**
+     * 상품명으로 판매중인 상품을 검색
+     * Page<ProductResponse>
+     * param Pageable, String keyword
+     */
+
+    /**
+     * 가격 범위로 판매중인 상품 검색
+     * Long minPrice, Long maxPrice
+     */
+
+    /**
+     *  카테고리 내에서 상품명으로 검색
+     *  categoryId, keyword
+     */
+
+
+    /**
+     *  extract method
+     *  Product Page를 ProductResponse의 Page 변환하는 공통 메소드 구현
+     *  Page<Product> -> Page<ProductResponse>
+     */
 
 }
