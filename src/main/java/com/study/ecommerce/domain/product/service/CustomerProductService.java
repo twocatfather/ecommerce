@@ -140,16 +140,41 @@ public class CustomerProductService {
      * Page<ProductResponse>
      * param Pageable, String keyword
      */
+    public Page<ProductResponse> searchActiveProducts(String keyword, Pageable pageable) {
+        Page<Product> products = productRepository.findByNameContainingIgnoreCaseAndStatus(keyword, ACTIVE, pageable);
+        return mapToProductResponse(products);
+    }
 
     /**
      * 가격 범위로 판매중인 상품 검색
      * Long minPrice, Long maxPrice
      */
+    public Page<ProductResponse> getActiveProductsByPriceRange(Long minPrice, Long maxPrice, Pageable pageable) {
+        Page<Product> products = productRepository.findByPriceBetweenAndStatus(minPrice, maxPrice, ACTIVE, pageable);
+        return mapToProductResponse(products);
+    }
 
     /**
      *  카테고리 내에서 상품명으로 검색
      *  categoryId, keyword
      */
+    public Page<ProductResponse> searchActiveProductsInCategory(Long categoryId, String keyword, Pageable pageable) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new EntityNotFoundException("카테고리를 찾을 수 없습니다."));
+
+        Page<Product> products =
+                productRepository.findByCategoryIdAndNameContainingIgnoreCaseAndStatus(categoryId, keyword, ACTIVE, pageable);
+
+        return products.map(product -> new ProductResponse(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                product.getStockQuantity(),
+                product.getStatus(),
+                category.getName()
+        ));
+    }
 
 
     /**
@@ -157,5 +182,39 @@ public class CustomerProductService {
      *  Product Page를 ProductResponse의 Page 변환하는 공통 메소드 구현
      *  Page<Product> -> Page<ProductResponse>
      */
+    private Page<ProductResponse> mapToProductResponse(Page<Product> products) {
+        List<Long> categoryIds = products.getContent().stream()
+                .map(Product::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, String> categoryMap = new HashMap<>();
+        if (!categoryIds.isEmpty()) {
+            List<Category> categories = categoryRepository.findAllById(categoryIds);
+            categories.forEach(category ->
+                    categoryMap.put(category.getId(), category.getName()));
+        }
+
+        return products.map(product -> {
+            String categoryName = "분류 없음";
+            if (product.getCategoryId() != null) {
+                categoryName = categoryMap.getOrDefault(product.getCategoryId(), "분류 없음");
+            }
+
+            return new ProductResponse(
+                    product.getId(),
+                    product.getName(),
+                    product.getDescription(),
+                    product.getPrice(),
+                    product.getStockQuantity(),
+                    product.getStatus(),
+                    categoryName
+            );
+        });
+
+    }
+
+
 
 }
