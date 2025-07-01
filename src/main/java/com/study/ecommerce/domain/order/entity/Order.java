@@ -7,7 +7,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
@@ -27,14 +30,30 @@ public class Order extends BaseTimeEntity {
 
     private LocalDateTime orderDate;
 
-    private Long totalAmount;
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    // db에 저장하지는 않는다.
+    @Transient
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Transient
+    private BigDecimal shippingCost = BigDecimal.ZERO;
+
+    @Transient
+    private String shippingAddress;
+
+    @Transient
+    private String phoneNumber;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<OrderItem> orderItems = new ArrayList<>();
 
     @Builder
-    public Order(Long memberId, OrderStatus status, LocalDateTime orderDate, Long totalAmount) {
+    public Order(Long memberId, OrderStatus status, LocalDateTime orderDate, BigDecimal totalAmount) {
         this.memberId = memberId;
         this.status = status;
         this.orderDate = orderDate;
-        this.totalAmount = totalAmount;
+        this.totalAmount = totalAmount != null ? totalAmount : BigDecimal.ZERO;
     }
 
     // 비지니스 메소드
@@ -42,7 +61,7 @@ public class Order extends BaseTimeEntity {
         this.status = status;
     }
 
-    public void updateTotalAmount(Long totalAmount) {
+    public void updateTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
     }
 
