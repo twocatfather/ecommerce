@@ -2,6 +2,7 @@ package com.study.ecommerce.domain.order.entity;
 
 import com.study.ecommerce.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -65,7 +66,19 @@ public class Order extends BaseTimeEntity {
         this.totalAmount = totalAmount;
     }
 
+    public void updateShippingAddress(String shippingAddress) {
+        this.shippingAddress = shippingAddress;
+    }
+
+    public void updatePhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public void updateDiscountAmount(BigDecimal maxDiscount) {
+        this.discountAmount = maxDiscount;
+    }
+
     public enum OrderStatus {
-        CREATED, PAID, CANCELED, SHIPPING, DELIVERED
+        CREATED, PAID, CANCELED, SHIPPING, CONFIRMED, DELIVERED
     }
 }
