@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 /**
  * Adapter Pattern: CJ대한통운 어댑터
  *
@@ -27,31 +29,46 @@ public class CjShippingAdapter implements ShippingGateway {
         log.info("CJ대한통운 어댑터 - 배송 등록 요청 변환 및 처리");
 
         // 1. 우리 시스템의 요청을 CJ API 형태로 변환
+        CjShippingRequest cjRequest = convertToCjRequest(request);
 
         // 2. CJ API 호출
+        CjShippingResponse cjShippingResponse = cjShippingApi.registerDelivery(cjRequest);
 
         // 3. CJ 응답을 우리 시스템 형태로 변환
-        return null;
+        return convertToShippingResponse(cjShippingResponse);
     }
 
     @Override
     public ShippingResponse getShippingStatus(String trackingNumber) {
         log.info("CJ대한통운 어댑터 - 배송 상태 조회: {}", trackingNumber);
-        return null;
+
+        CjTrackingResponse cjShippingApiTrackingInfo = cjShippingApi.getTrackingInfo(trackingNumber);
+        return convertTrackingToShippingResponse(cjShippingApiTrackingInfo);
     }
 
     @Override
     public ShippingResponse cancelShipping(String trackingNumber, String reason) {
         log.info("CJ대한통운 어댑터 - 배송 취소: {}, 사유: {}", trackingNumber, reason);
-
-        return null;
+        CjShippingResponse cjShippingResponse = cjShippingApi.cancelDelivery(trackingNumber, reason);
+        return convertToShippingResponse(cjShippingResponse);
     }
 
     @Override
     public int calculateShippingCost(ShippingRequest request) {
-        // CJ API를 통해 실제 배송비 계산 (여기서는 간단 계산)
+        int baseCharge = 3000; // 기본 배송비
 
-        return 0;
+        // 무게에 따른 추가 요금
+        // 5kg 초과
+        if (request.weight() > 5000) {
+            baseCharge += 2000;
+        }
+
+        // 제주도/도서산간 추가 요금
+        if (request.receiverZipCode().startsWith("63")) {
+            baseCharge += 3000;
+        }
+
+        return baseCharge;
     }
 
     @Override
@@ -63,7 +80,20 @@ public class CjShippingAdapter implements ShippingGateway {
      * 공통 요청을 CJ API 요청으로 변환
      */
     private CjShippingRequest convertToCjRequest(ShippingRequest request) {
-        return null;
+        return CjShippingRequest.builder()
+                .orderNo(request.orderId())
+                .senderAddr(request.senderAddress())
+                .senderName(request.senderName())
+                .senderTel(request.senderPhone())
+                .receiverAddr(request.receiverAddress())
+                .receiverName(request.receiverName())
+                .receiverZipCode(request.receiverZipCode())
+                .receiverTel(request.receiverPhone())
+                .weight(request.weight())
+                .boxType(convertPackageType(request.packageType()))
+                .specialService("01")
+                .deliveryMessage(request.deliveryMessage())
+                .build();
     }
 
     /**
@@ -82,14 +112,35 @@ public class CjShippingAdapter implements ShippingGateway {
      * CJ API 응답을 공통 응답으로 변환
      */
     private ShippingResponse convertToShippingResponse(CjShippingResponse cjResponse) {
-        return null;
+        boolean success = "0000".equals(cjResponse.resultCode());
+
+        return ShippingResponse.builder()
+                .success(success)
+                .trackingNumber(cjResponse.invoiceNo())
+                .status(success ? "REGISTERED" : "FAILED")
+                .message(cjResponse.resultMessage())
+                .shippingCost(cjResponse.deliveryCharge())
+                .estimatedDeliveryDate(LocalDateTime.now().plusDays(2))
+                .carrierName(getCarrierName())
+                .errorCode(success ? null : cjResponse.resultCode())
+                .build();
     }
 
     /**
      * CJ 배송 조회 응답을 공통 응답으로 변환
      */
     private ShippingResponse convertTrackingToShippingResponse(CjTrackingResponse cjResponse) {
-        return null;
+        boolean success = "0000".equals(cjResponse.resultCode());
+        String status = convertCjStatus(cjResponse.deliveryStatus());
+
+        return ShippingResponse.builder()
+                .success(success)
+                .trackingNumber(cjResponse.invoiceNo())
+                .status(status)
+                .message(cjResponse.resultMessage())
+                .carrierName(getCarrierName())
+                .errorCode(success ? null : cjResponse.resultCode())
+                .build();
     }
 
     /**
